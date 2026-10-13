@@ -1,109 +1,80 @@
-Item & Purchase Management System
+# Item & Purchase Management System
 
-📌 Project Overview
+Node.js + Express + MySQL web application for managing Item Types, Items, Purchases (multi-item orders), stock and purchase history. The frontend is plain HTML/CSS/JS served by the same Express server, so there is **one command to start everything**.
 
-The Item & Purchase Management System is a web-based application designed to manage item categories, inventory stock, purchase orders, and item availability efficiently.
-
-The application helps users organize inventory, track available stock, and maintain purchase records through a simple interface.
-
-✨ Features
-
-- Item Type Management: Create and manage item categories.
-- Item Management: Add items with their type, purchase date, stock quantity, and status.
-- Purchase Management: Create purchase orders and add items with specified quantities.
-- Stock Tracking: Monitor current stock and item availability.
-- Search and Filtering: Search items and filter them by status.
-- Purchase History: View previously created purchase records.
-
-🛠️ Technologies Used
-
-- Backend: Node.js, Express.js
-- Database: MySQL
-- Database Driver: mysql2
-- Environment Configuration: dotenv
-- Frontend: Web interface (HTML, CSS, and JavaScript, if applicable)
-
-📂 Project Structure
-
-item-purchase-management-system/
-├── docs/
-├── public/
-├── routes/
-├── scripts/
-├── db.js
-├── .env.example
-├── package.json
-├── package-lock.json
-└── README.md
-
-⚙️ Installation and Setup
-
-Prerequisites
-
-- Node.js (version 18 or later)
-- MySQL Server
+## Prerequisites
+- Node.js 18+ (developed on 22)
+- MySQL 8.0+ (MariaDB 10.5+ also works)
 - npm
 
-Step 1: Clone the Repository
-
-git clone YOUR_GITHUB_REPOSITORY_URL
-cd item-purchase-management-system
-
-Replace "YOUR_GITHUB_REPOSITORY_URL" with your actual repository URL.
-
-Step 2: Install Dependencies
-
+## 1. Install dependencies
+```bash
 npm install
+```
 
-Step 3: Configure Environment Variables
-
-Create a ".env" file in the project root using ".env.example" as a template.
-
-Configure the following values:
-
+## 2. Configure MySQL credentials
+```bash
+cp .env.example .env
+```
+Edit `.env`:
+```
 PORT=3000
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=your_mysql_password
 DB_NAME=item_purchase_db
+```
 
-Replace "your_mysql_password" with your actual MySQL password.
+## 3. Create the database / run the schema
+Pick one:
+```bash
+npm run db:setup          # creates DB + tables via Node (uses .env credentials)
+npm run db:seed           # same + loads sample data (item types and items)
+# or with the mysql client:
+mysql -u root -p < schema.sql
+mysql -u root -p item_purchase_db < sample_data.sql    # optional sample data
+```
+> `schema.sql` drops and recreates the four tables — don't re-run it on data you want to keep.
 
-Step 4: Start MySQL Server
+## 4. Start
+```bash
+npm start            # backend API + frontend  →  http://localhost:3000
+npm run dev          # same, auto-restart on file changes (Node 18.11+)
+```
+There is no separate frontend server: open **http://localhost:3000**.
 
-Ensure that the MySQL service is running on your computer.
+## Using the app
+1. **Item Types** – add Electronics, Furniture, …
+2. **Items** – create items (name, type, date, stock, Active/Inactive). View details, update, activate/deactivate, delete (only if never purchased).
+3. **Create Purchase** – Order ID is pre-filled (`PO-00001`…), pick an item + quantity, *Add to order* (repeat), remove lines you don't want, *Submit Purchase*. Only Active items are selectable.
+4. **Purchases** – list, *View Details*, *Update*. There is no delete button/endpoint for purchases.
+5. **Stock** – In Stock (> 5), Low Stock (1–5), Out of Stock (0).
 
-Step 5: Set Up the Database
+## Project structure
+```
+server.js            Express app, error handler, static hosting
+db.js                MySQL connection pool
+utils.js             validators, HttpError, stock status helper
+routes/              itemTypes.js · items.js · purchases.js · stock.js
+public/              index.html · style.css · app.js  (frontend)
+schema.sql           database schema
+sample_data.sql      optional sample data
+scripts/setup-db.js  runs schema (+ sample data)
+docs/API.md          API documentation
+docs/postman_collection.json
+```
 
-npm run db:setup
+## Design notes
+- **Backend validation** for every rule in the assignment; the frontend only adds convenience checks.
+- **Transactions:** purchase create/update run in one transaction (`BEGIN → lock + validate → insert → update stock → COMMIT`, `ROLLBACK` on any error). Item rows are locked with `SELECT … FOR UPDATE`, so simultaneous purchases can't oversell (verified: 12 parallel requests for 4 units → exactly 4 succeed).
+- **Stock never negative:** checked in code *and* enforced by an `UNSIGNED` column.
+- **Purchase update:** stock is adjusted by `new − old` per item (3 → 5 deducts 2; 5 → 2 returns 3).
+- **No purchase deletion:** no DELETE route (a `DELETE` returns 405), no UI button, and the foreign keys use `ON DELETE RESTRICT`.
+- **Item deletion:** blocked with 409 when the item is in any purchase; deactivate it instead. Inactive items stay visible in historical purchases.
+- **Duplicate items in one order** are rejected (400), consistently on create and update.
+- **Errors:** 400 / 404 / 405 / 409 with clear messages; unexpected errors return a generic 500 and are logged server-side only.
+- **JOINs:** Item + Item Type, and Purchase + Purchase Items + Items + Item Types (see `docs/API.md`).
 
-Step 6: Start the Application
-
-npm start
-
-Open the application in your browser:
-
-http://localhost:3000
-
-🚀 How to Use
-
-1. Open the Item Types page and create an item category.
-2. Navigate to Items and create an item with its category and stock quantity.
-3. Open Create Purchase and select items and quantities.
-4. Submit the purchase order.
-5. View stock availability and purchase records.
-
-🔒 Security
-
-- Store database credentials in the ".env" file.
-- Do not commit ".env" or other files containing secrets to GitHub.
-- Use ".env.example" to document the required environment variables without exposing credentials.
-
-👨‍💻 Author
-
-Adarsha J P
-
-📄 License
-
-This project was developed as a full-stack development assignment.
+## Screenshots
+Run the app, then capture these screens into a `screenshots/` folder: Item Types, Items list + form, Create Purchase (multiple lines), Purchase Details, an "Insufficient stock" error, and the Stock view.
